@@ -49,6 +49,14 @@ php artisan key:generate
 mysql -u USERNAME -p < database/smknulum.sql
 ```
 
+Disarankan memakai user database khusus untuk aplikasi (bukan root):
+
+```sql
+CREATE USER 'smknulum_app'@'localhost' IDENTIFIED BY 'GANTI_DENGAN_PASSWORD_AMAN';
+GRANT ALL PRIVILEGES ON smknulum.* TO 'smknulum_app'@'localhost';
+FLUSH PRIVILEGES;
+```
+
 File ini membuat database `smknulum` (40 tabel + data dummy). Sesuaikan kredensial di `.env`:
 
 ```env
@@ -66,13 +74,18 @@ DB_PASSWORD=...
 php artisan migrate --seed
 ```
 
+> Seeder akan membuat data awal: peran pengguna (role), akun admin, guru, siswa, kelas, jadwal, bank soal, dan contoh ujian. Setelah instalasi selesai, segera ubah kata sandi akun admin hasil seeder sebelum digunakan.
+
 ### Aset Frontend & Menjalankan Aplikasi
 
 ```bash
 npm install
 npm run build
+php artisan storage:link   # wajib untuk upload file (tugas, jawaban ujian, lampiran)
 php artisan serve
 ```
+
+Akses aplikasi di `http://127.0.0.1:8000`.
 
 ## Testing
 
