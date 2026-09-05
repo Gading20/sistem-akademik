@@ -74,14 +74,6 @@ npm run build
 php artisan serve
 ```
 
-## Akun Default (data seeder)
-
-| Role          | Email                        | Password  |
-|---------------|------------------------------|-----------|
-| Super Admin   | admin@smknurululum.sch.id    | password  |
-
-> ⚠️ Segera ganti semua password default sebelum digunakan di produksi (lihat `SECURITY.md`).
-
 ## Testing
 
 ```bash
