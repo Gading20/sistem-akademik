@@ -17,12 +17,14 @@ use App\Models\Major;
 use App\Models\Question;
 use App\Models\QuestionBank;
 use App\Models\QuestionOption;
+use App\Models\Role;
 use App\Models\Room;
 use App\Models\Schedule;
 use App\Models\Semester;
+use App\Models\Student;
 use App\Models\Subject;
+use App\Models\Teacher;
 use App\Models\TeachingAssignment;
-use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -140,11 +142,11 @@ class AcademicDataSeeder extends Seeder
         }
 
         $teacherNames = [
-            ['name' => 'Ahmad Fauzi, S.Pd', 'email' => 'ahmad@smknurululum.sch.id'],
-            ['name' => 'Siti Rahmawati, S.Pd', 'email' => 'siti@smknurululum.sch.id'],
-            ['name' => 'Budi Santoso, S.Kom', 'email' => 'budi@smknurululum.sch.id'],
-            ['name' => 'Dewi Lestari, S.E.', 'email' => 'dewi@smknurululum.sch.id'],
-            ['name' => 'Eko Prasetyo, S.Pd', 'email' => 'eko@smknurululum.sch.id'],
+            ['name' => 'Ahmad Fauzi, S.Pd', 'email' => 'ahmad@smknurululum.sch.id', 'gender' => 'male'],
+            ['name' => 'Siti Rahmawati, S.Pd', 'email' => 'siti@smknurululum.sch.id', 'gender' => 'female'],
+            ['name' => 'Budi Santoso, S.Kom', 'email' => 'budi@smknurululum.sch.id', 'gender' => 'male'],
+            ['name' => 'Dewi Lestari, S.E.', 'email' => 'dewi@smknurululum.sch.id', 'gender' => 'female'],
+            ['name' => 'Eko Prasetyo, S.Pd', 'email' => 'eko@smknurululum.sch.id', 'gender' => 'male'],
         ];
 
         $teachers = [];
@@ -158,12 +160,14 @@ class AcademicDataSeeder extends Seeder
                 'email_verified_at' => now(),
             ]);
 
-            $teachers[] = \App\Models\Teacher::create([
+            $teachers[] = Teacher::create([
                 'user_id' => $user->id,
-                'nip' => '19850101201001' . str_pad($i + 1, 2, '0', STR_PAD_LEFT),
-                'nuptk' => '1234567890' . str_pad($i + 1, 2, '0', STR_PAD_LEFT),
+                'nip' => '19850101201001'.str_pad($i + 1, 2, '0', STR_PAD_LEFT),
+                'nuptk' => '1234567890'.str_pad($i + 1, 2, '0', STR_PAD_LEFT),
+                'gender' => $tData['gender'] ?? null,
                 'subject_id' => $createdSubjects[$i]->id,
                 'join_date' => '2010-07-01',
+                'employment_status' => 'active',
                 'is_active' => true,
             ]);
         }
@@ -231,23 +235,23 @@ class AcademicDataSeeder extends Seeder
 
             $user = User::create([
                 'name' => $sData['name'],
-                'email' => strtolower(str_replace(' ', '.', $sData['name'])) . '@student.smknurululum.sch.id',
+                'email' => strtolower(str_replace(' ', '.', $sData['name'])).'@student.smknurululum.sch.id',
                 'password' => Hash::make('password'),
                 'role_id' => $siswaRole->id,
                 'is_active' => true,
                 'email_verified_at' => now(),
             ]);
 
-            $students[] = \App\Models\Student::create([
+            $students[] = Student::create([
                 'user_id' => $user->id,
                 'nis' => str_pad($i + 1, 6, '0', STR_PAD_LEFT),
-                'nisn' => '00' . str_pad($i + 1, 6, '0', STR_PAD_LEFT),
+                'nisn' => '00'.str_pad($i + 1, 6, '0', STR_PAD_LEFT),
                 'class_id' => $class->id,
                 'birth_place' => 'Jakarta',
                 'birth_date' => '2008-01-15',
                 'gender' => $sData['gender'],
                 'religion' => 'Islam',
-                'address' => 'Jl. Pendidikan No. ' . ($i + 1),
+                'address' => 'Jl. Pendidikan No. '.($i + 1),
                 'admission_date' => '2025-07-14',
                 'status' => 'active',
             ]);

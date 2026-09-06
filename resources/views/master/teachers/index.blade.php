@@ -58,12 +58,22 @@
                             <td class="px-4 py-3 font-mono text-sm text-gray-900">{{ $teacher->nip ?: '-' }}</td>
                             <td class="px-4 py-3 font-medium text-gray-900">{{ $teacher->user->name }}</td>
                             <td class="px-4 py-3 text-gray-600">{{ $teacher->subject->name ?? '-' }}</td>
-                            <td class="px-4 py-3 text-gray-600">{{ $teacher->gender === 'male' ? 'Laki-laki' : 'Perempuan' }}</td>
+                            <td class="px-4 py-3 text-gray-600">
+                                @if($teacher->gender === 'male')
+                                    Laki-laki
+                                @elseif($teacher->gender === 'female')
+                                    Perempuan
+                                @else
+                                    -
+                                @endif
+                            </td>
                             <td class="px-4 py-3">
                                 @if($teacher->employment_status === 'active')
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Aktif</span>
-                                @else
+                                @elseif($teacher->employment_status)
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{{ ucfirst($teacher->employment_status) }}</span>
+                                @else
+                                    -
                                 @endif
                             </td>
                             <td class="px-4 py-3">

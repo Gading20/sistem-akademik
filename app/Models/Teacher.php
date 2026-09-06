@@ -15,7 +15,16 @@ class Teacher extends Model
         'user_id',
         'nip',
         'nuptk',
+        'gender',
+        'nik',
         'subject_id',
+        'place_of_birth',
+        'date_of_birth',
+        'qualification',
+        'specialization',
+        'phone',
+        'address',
+        'employment_status',
         'join_date',
         'contract_end_date',
         'is_active',
@@ -26,6 +35,7 @@ class Teacher extends Model
         return [
             'join_date' => 'date',
             'contract_end_date' => 'date',
+            'date_of_birth' => 'date',
             'is_active' => 'boolean',
         ];
     }
