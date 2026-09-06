@@ -17,7 +17,16 @@
                     <div class="flex-1">
                         <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari ujian..." class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
                     </div>
-                    <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors">Cari</button>
+                    <div>
+                        <select name="status" class="w-full sm:w-auto px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                            <option value="">Semua Status</option>
+                            <option value="available" {{ request('status') === 'available' ? 'selected' : '' }}>Tersedia</option>
+                            <option value="in_progress" {{ request('status') === 'in_progress' ? 'selected' : '' }}>Berlangsung</option>
+                            <option value="completed" {{ request('status') === 'completed' ? 'selected' : '' }}>Selesai</option>
+                            <option value="unavailable" {{ request('status') === 'unavailable' ? 'selected' : '' }}>Tidak tersedia</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors">Terapkan</button>
                 </div>
             </form>
         </div>
@@ -29,12 +38,14 @@
                         <div class="flex-1">
                             <div class="flex items-center gap-2 mb-1">
                                 <h3 class="text-base font-semibold text-gray-900">{{ $exam->title }}</h3>
-                                @if($exam->status->value === 'active')
+                                @if($exam->student_status === 'in_progress')
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Berlangsung</span>
-                                @elseif($exam->status->value === 'published' && $exam->not_started)
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">Belum Dimulai</span>
-                                @elseif($exam->status->value === 'published')
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Dibuka</span>
+                                @elseif($exam->student_status === 'completed')
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Selesai</span>
+                                @elseif($exam->student_status === 'available')
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">Tersedia</span>
+                                @else
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Tidak tersedia</span>
                                 @endif
                             </div>
                             <p class="text-sm text-gray-500 mt-1">{{ $exam->subject->name ?? '-' }} | {{ $exam->type->label() }}</p>
@@ -65,21 +76,28 @@
                             @endif
                         </div>
                         <div class="ml-4 flex-shrink-0">
-                            @if($exam->has_attempted && $exam->last_attempt)
+                            @if($exam->student_status === 'in_progress' && $exam->in_progress_attempt)
+                                <a href="{{ route('exam.exams.attempt', $exam->in_progress_attempt) }}" class="inline-flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                    Lanjutkan
+                                </a>
+                            @elseif($exam->student_status === 'completed' && $exam->last_attempt)
                                 <a href="{{ route('exam.exams.result', $exam->last_attempt) }}" class="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors">
                                     Lihat Hasil
                                 </a>
-                            @elseif($exam->can_attempt && $exam->not_started)
-                                <span class="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-400 text-sm font-medium rounded-lg cursor-not-allowed" title="Ujian akan terbuka otomatis sesuai jadwal mulai">
-                                    Kerjakan
-                                </span>
-                            @elseif($exam->can_attempt)
+                            @elseif($exam->student_status === 'available')
                                 <form method="POST" action="{{ route('exam.exams.start', $exam) }}" class="inline">
                                     @csrf
                                     <button type="submit" class="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
                                         Kerjakan
                                     </button>
                                 </form>
+                            @else
+                                <span class="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-400 text-sm font-medium rounded-lg cursor-not-allowed" title="{{ $exam->not_started ? 'Ujian belum dibuka. Tersedia otomatis sesuai jadwal mulai.' : ($exam->ended ? 'Jadwal ujian telah berakhir.' : 'Anda tidak dapat mengerjakan ujian ini.') }}">
+                                    Kerjakan
+                                </span>
                             @endif
                         </div>
                     </div>
@@ -89,10 +107,16 @@
                     <svg class="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    <p class="text-sm text-gray-500">Tidak ada ujian tersedia saat ini</p>
+                    <p class="text-sm text-gray-500">{{ request('status') || request('search') ? 'Tidak ada ujian yang sesuai dengan filter saat ini' : 'Tidak ada ujian tersedia saat ini' }}</p>
                 </div>
             @endforelse
         </div>
+
+        @if($exams->hasPages())
+            <div class="px-4 py-3 border-t border-gray-200">
+                {{ $exams->links() }}
+            </div>
+        @endif
     </div>
 </div>
 @endsection

@@ -13,6 +13,7 @@ use App\Services\AuditLogService;
 use App\Services\ExamService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
@@ -23,27 +24,28 @@ class ExamAttemptController extends Controller
         protected AuditLogService $auditLogService,
     ) {}
 
-    public function available(): View
+    public function available(Request $request): View
     {
         $this->authorize('viewAny', Exam::class);
 
         $student = Auth::user()->student;
         $classIds = $student->activeClassIds();
 
+        // Semua ujian published/active yang ditugaskan ke kelas siswa — termasuk
+        // yang jadwalnya sudah lewat tapi belum dikerjakan, agar terlihat sebagai
+        // "Tidak tersedia" (ujian terlewat).
         $exams = Exam::with(['subject', 'teacher.user'])
             ->withCount('examQuestions')
             ->whereIn('status', [ExamStatusEnum::PUBLISHED, ExamStatusEnum::ACTIVE])
             ->where(function ($q) use ($classIds) {
                 $q->whereDoesntHave('examClasses')
-                  ->orWhereHas('examClasses', fn ($cq) => $cq->whereIn('class_id', $classIds));
+                    ->orWhereHas('examClasses', fn ($cq) => $cq->whereIn('class_id', $classIds));
             })
-            ->where(function ($q) use ($student) {
-                // Ujian yang masih berjalan/jadwalnya belum lewat, atau yang pernah dikerjakan siswa (agar hasil tetap bisa dilihat).
-                $q->where('end_at', '>=', now())
-                  ->orWhereHas('attempts', fn ($aq) => $aq->where('student_id', $student->id));
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $q->where('title', 'like', '%'.$request->search.'%');
             })
             ->latest()
-            ->paginate(15);
+            ->get();
 
         $now = now();
         $studentAttemptCounts = ExamAttempt::where('student_id', $student->id)
@@ -59,17 +61,67 @@ class ExamAttemptController extends Controller
             ->groupBy('exam_id')
             ->map(fn ($attempts) => $attempts->first());
 
-        $exams->getCollection()->transform(function ($exam) use ($studentAttemptCounts, $studentLastAttempts, $now) {
+        // Percobaan yang masih berjalan (sedang dikerjakan), agar bisa dilanjutkan.
+        $studentInProgressAttempts = ExamAttempt::where('student_id', $student->id)
+            ->where('status', ExamAttemptStatusEnum::IN_PROGRESS)
+            ->latest()
+            ->get()
+            ->groupBy('exam_id')
+            ->map(fn ($attempts) => $attempts->first());
+
+        $exams = $exams->map(function ($exam) use ($studentAttemptCounts, $studentLastAttempts, $studentInProgressAttempts, $now) {
             $attemptCount = $studentAttemptCounts->get($exam->id, 0);
             $exam->has_attempted = $attemptCount > 0;
             $exam->last_attempt = $studentLastAttempts->get($exam->id);
+            $exam->in_progress_attempt = $studentInProgressAttempts->get($exam->id);
             $exam->can_attempt = $attemptCount < $exam->attempt_limit;
             $exam->not_started = $exam->start_at && $now->lt($exam->start_at);
             $exam->ended = $exam->end_at && $now->gt($exam->end_at);
+            $exam->student_status = $this->resolveStudentStatus($exam);
+
             return $exam;
         });
 
+        // Filter status (dihitung per ujian, jadi difilter setelah transform).
+        $allowedStatuses = ['available', 'in_progress', 'completed', 'unavailable'];
+        if ($request->filled('status') && in_array($request->status, $allowedStatuses, true)) {
+            $exams = $exams->where('student_status', $request->status);
+        }
+
+        $exams = $exams->values();
+
+        $perPage = 15;
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $exams = new LengthAwarePaginator(
+            $exams->forPage($page, $perPage)->values(),
+            $exams->count(),
+            $perPage,
+            $page,
+            ['path' => LengthAwarePaginator::resolveCurrentPath(), 'query' => $request->query()]
+        );
+
         return view('exam.exams.available', compact('exams'));
+    }
+
+    /**
+     * Status ujian dari sudut pandang siswa: sedang dikerjakan, selesai,
+     * tersedia (belum dikerjakan), atau tidak tersedia.
+     */
+    protected function resolveStudentStatus($exam): string
+    {
+        if ($exam->in_progress_attempt) {
+            return 'in_progress';
+        }
+
+        if ($exam->has_attempted) {
+            return 'completed';
+        }
+
+        if ($exam->not_started || $exam->ended || ! $exam->can_attempt) {
+            return 'unavailable';
+        }
+
+        return 'available';
     }
 
     public function start(Exam $exam): RedirectResponse
@@ -165,21 +217,21 @@ class ExamAttemptController extends Controller
             ->where('question_id', $question->id)
             ->exists();
 
-        if (!$belongsToExam) {
+        if (! $belongsToExam) {
             abort(422, 'Soal tidak termasuk dalam ujian ini.');
         }
 
         // Pilihan jawaban harus milik soal yang bersangkutan (anti injeksi
         // pilihan jawaban dari soal lain).
         if ($request->filled('selected_option_id')
-            && !$question->options()->where('id', $request->selected_option_id)->exists()) {
+            && ! $question->options()->where('id', $request->selected_option_id)->exists()) {
             abort(422, 'Pilihan jawaban tidak valid untuk soal ini.');
         }
 
         $isComplex = $question->type === QuestionTypeEnum::MCQ_COMPLEX->value;
 
         $data = [
-            'selected_option_id' => !$isComplex ? $request->selected_option_id : null,
+            'selected_option_id' => ! $isComplex ? $request->selected_option_id : null,
             'essay_answer' => $request->essay_answer,
             'answer' => $isComplex ? $request->answer : null,
         ];

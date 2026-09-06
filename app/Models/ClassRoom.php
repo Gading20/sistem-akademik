@@ -20,6 +20,7 @@ class ClassRoom extends Model
         'competency_id',
         'academic_year_id',
         'semester_id',
+        'wali_kelas_id',
         'capacity',
         'is_active',
     ];
@@ -50,6 +51,11 @@ class ClassRoom extends Model
     public function semester(): BelongsTo
     {
         return $this->belongsTo(Semester::class);
+    }
+
+    public function waliKelas(): BelongsTo
+    {
+        return $this->belongsTo(Teacher::class, 'wali_kelas_id');
     }
 
     public function classMembers(): HasMany

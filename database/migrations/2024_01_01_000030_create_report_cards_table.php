@@ -25,7 +25,7 @@ return new class extends Migration
             $table->foreignId('finalized_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
 
-            $table->unique(['student_id', 'class_id', 'academic_year_id', 'semester_id']);
+            $table->unique(['student_id', 'class_id', 'academic_year_id', 'semester_id'], 'report_cards_scope_unique');
         });
     }
 

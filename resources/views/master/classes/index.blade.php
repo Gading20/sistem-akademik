@@ -69,7 +69,7 @@
                             <td class="px-4 py-3 text-gray-600">{{ $class->grade_level }}</td>
                             <td class="px-4 py-3 text-gray-600">{{ $class->major->name ?? '-' }}</td>
                             <td class="px-4 py-3 text-gray-600">{{ $class->academicYear->name ?? '-' }}</td>
-                            <td class="px-4 py-3 text-gray-600">{{ $class->teacher?->user?->name ?? '-' }}</td>
+                            <td class="px-4 py-3 text-gray-600">{{ $class->waliKelas?->user?->name ?? '-' }}</td>
                             <td class="px-4 py-3">
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">{{ $class->class_members_count ?? 0 }} siswa</span>
                             </td>

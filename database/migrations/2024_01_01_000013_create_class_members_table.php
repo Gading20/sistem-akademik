@@ -17,7 +17,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 
-            $table->unique(['class_id', 'student_id', 'academic_year_id', 'semester_id']);
+            $table->unique(['class_id', 'student_id', 'academic_year_id', 'semester_id'], 'class_members_enrollment_unique');
         });
     }
 

@@ -3,6 +3,12 @@
 @section('title', 'Absensi')
 @section('header', 'Absensi')
 
+@push('head')
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+@endpush
+
 @section('content')
 <div class="space-y-6">
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -17,7 +23,7 @@
             <form method="GET" action="{{ route('academic.attendance.index') }}">
                 <div class="flex flex-col sm:flex-row gap-3">
                     <div class="w-full sm:w-48">
-                        <select name="class_id" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        <select name="class_id" id="class_id_filter" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
                             <option value="">Pilih Kelas</option>
                             @foreach($classes as $class)
                                 <option value="{{ $class->id }}" {{ request('class_id') == $class->id ? 'selected' : '' }}>{{ $class->name }}</option>
@@ -25,24 +31,47 @@
                         </select>
                     </div>
                     <div class="w-full sm:w-48">
-                        <input type="date" name="date" value="{{ request('date', date('Y-m-d')) }}" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        <input type="date" name="date" id="date_filter" value="{{ request('date', date('Y-m-d')) }}" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                    </div>
+                    <div class="w-full sm:w-64">
+                        <select name="schedule_id" id="schedule_id_filter" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                            <option value="">Pilih Jadwal</option>
+                            @foreach($schedules as $schedule)
+                                <option value="{{ $schedule->id }}" {{ request('schedule_id') == $schedule->id ? 'selected' : '' }}>
+                                    {{ $schedule->start_time }} - {{ $schedule->end_time }} | {{ $schedule->teachingAssignment->subject->name ?? '-' }}
+                                </option>
+                            @endforeach
+                        </select>
                     </div>
                     <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors">Tampilkan</button>
                 </div>
             </form>
         </div>
 
-        @if(isset($students) && count($students) > 0)
+        @if(isset($students) && count($students) > 0 && request('schedule_id'))
             <div class="p-4 border-b border-gray-200 bg-gray-50">
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-sm font-medium text-gray-900">{{ $classes->firstWhere('id', request('class_id'))?->name ?? '-' }} - {{ \Carbon\Carbon::parse(request('date', date('Y-m-d')))->locale('id')->isoFormat('dddd, D MMMM Y') }}</p>
-                        <p class="text-xs text-gray-500 mt-1">Isi kehadiran untuk setiap siswa</p>
+                        <p class="text-xs text-gray-500 mt-1">
+                            @if($isAlreadyRecorded)
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-green-100 text-green-700 rounded-full font-medium">
+                                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                    </svg>
+                                    Absensi sudah dicatat - Mode Edit
+                                </span>
+                            @else
+                                Isi kehadiran untuk setiap siswa
+                            @endif
+                        </p>
                     </div>
+                    @if(!$isAlreadyRecorded)
                     <div class="flex gap-2">
-                        <button type="button" onclick="setAllStatus('hadir')" class="px-3 py-1.5 text-xs font-medium text-green-700 bg-green-100 rounded-lg hover:bg-green-200 transition-colors" @disabled($schedules->isEmpty())>Semua Hadir</button>
-                        <button type="button" onclick="setAllStatus('alpa')" class="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-100 rounded-lg hover:bg-red-200 transition-colors" @disabled($schedules->isEmpty())>Semua Tidak Hadir</button>
+                        <button type="button" onclick="setAllStatus('hadir')" class="px-3 py-1.5 text-xs font-medium text-green-700 bg-green-100 rounded-lg hover:bg-green-200 transition-colors">Semua Hadir</button>
+                        <button type="button" onclick="setAllStatus('alpa')" class="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-100 rounded-lg hover:bg-red-200 transition-colors">Semua Tidak Hadir</button>
                     </div>
+                    @endif
                 </div>
             </div>
 
@@ -50,27 +79,13 @@
                 <div class="px-4 py-8 text-center bg-amber-50">
                     <p class="text-sm text-amber-700">Tidak ada jadwal pelajaran untuk kelas ini di hari tersebut. Buat jadwal terlebih dahulu.</p>
                 </div>
-            @else
+            @elseif(!$isAlreadyRecorded)
+            <!-- FORM INPUT BARU -->
             <form method="POST" action="{{ route('academic.attendance.bulk-record') }}" x-data="{ saving: false }" @submit="saving = true">
                 @csrf
                 <input type="hidden" name="class_id" value="{{ request('class_id') }}">
                 <input type="hidden" name="date" value="{{ request('date', date('Y-m-d')) }}">
-
-                @if($schedules->count() > 1)
-                    <div class="px-4 py-3 border-b border-gray-200">
-                        <label for="schedule_id" class="block text-sm font-medium text-gray-700 mb-1.5">Jadwal</label>
-                        <select name="schedule_id" id="schedule_id" class="w-full max-w-md px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
-                            <option value="">Pilih Jadwal</option>
-                            @foreach($schedules as $schedule)
-                                <option value="{{ $schedule->id }}" {{ old('schedule_id') == $schedule->id ? 'selected' : '' }}>
-                                    {{ $schedule->start_time }} - {{ $schedule->end_time }} | {{ $schedule->teachingAssignment->subject->name ?? '-' }} ({{ $schedule->teachingAssignment->teacher->user->name ?? '-' }})
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                @elseif($schedules->count() === 1)
-                    <input type="hidden" name="schedule_id" value="{{ $schedules->first()->id }}">
-                @endif
+                <input type="hidden" name="schedule_id" value="{{ request('schedule_id') }}">
 
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
@@ -126,7 +141,80 @@
                     </button>
                 </div>
             </form>
+            @else
+            <!-- FORM EDIT ABSENSI YANG SUDAH ADA -->
+            <form method="POST" action="{{ route('academic.attendance.bulk-update') }}" x-data="{ saving: false }" @submit="saving = true">
+                @csrf
+                @method('PUT')
+                <input type="hidden" name="schedule_id" value="{{ request('schedule_id') }}">
+                <input type="hidden" name="date" value="{{ request('date', date('Y-m-d')) }}">
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-200 bg-gray-50">
+                                <th class="text-left px-4 py-3 font-medium text-gray-600">No</th>
+                                <th class="text-left px-4 py-3 font-medium text-gray-600">NIS</th>
+                                <th class="text-left px-4 py-3 font-medium text-gray-600">Nama Siswa</th>
+                                <th class="text-center px-4 py-3 font-medium text-gray-600">Hadir</th>
+                                <th class="text-center px-4 py-3 font-medium text-gray-600">Izin</th>
+                                <th class="text-center px-4 py-3 font-medium text-gray-600">Sakit</th>
+                                <th class="text-center px-4 py-3 font-medium text-gray-600">Alpha</th>
+                                <th class="text-left px-4 py-3 font-medium text-gray-600">Keterangan</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @foreach($students as $student)
+                                @php
+                                    $existingAttendance = $existingAttendances->get($student->id);
+                                @endphp
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-3 text-gray-500">{{ $loop->iteration }}</td>
+                                    <td class="px-4 py-3 font-mono text-sm text-gray-600">{{ $student->nis }}</td>
+                                    <td class="px-4 py-3 font-medium text-gray-900">{{ $student->user->name }}</td>
+                                    <td class="px-4 py-3 text-center">
+                                        <input type="radio" name="attendances[{{ $loop->index }}][status]" value="hadir" {{ $existingAttendance && $existingAttendance->status === 'hadir' ? 'checked' : '' }} class="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500" required>
+                                    </td>
+                                    <td class="px-4 py-3 text-center">
+                                        <input type="radio" name="attendances[{{ $loop->index }}][status]" value="izin" {{ $existingAttendance && $existingAttendance->status === 'izin' ? 'checked' : '' }} class="w-4 h-4 text-amber-600 border-gray-300 focus:ring-amber-500" required>
+                                    </td>
+                                    <td class="px-4 py-3 text-center">
+                                        <input type="radio" name="attendances[{{ $loop->index }}][status]" value="sakit" {{ $existingAttendance && $existingAttendance->status === 'sakit' ? 'checked' : '' }} class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" required>
+                                    </td>
+                                    <td class="px-4 py-3 text-center">
+                                        <input type="radio" name="attendances[{{ $loop->index }}][status]" value="alpa" {{ $existingAttendance && $existingAttendance->status === 'alpa' ? 'checked' : '' }} class="w-4 h-4 text-red-600 border-gray-300 focus:ring-red-500" required>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <input type="text" name="attendances[{{ $loop->index }}][note]" value="{{ $existingAttendance->note ?? '' }}" placeholder="Keterangan..." class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                                        <input type="hidden" name="attendances[{{ $loop->index }}][attendance_id]" value="{{ $existingAttendance->id }}">
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="p-4 border-t border-gray-200 flex justify-end gap-3">
+                    <a href="{{ route('academic.attendance.index', ['class_id' => request('class_id'), 'date' => request('date')]) }}" class="px-4 py-2.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors">
+                        Batal
+                    </a>
+                    <button type="submit" :disabled="saving" class="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50">
+                        <svg x-show="saving" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Update Absensi
+                    </button>
+                </div>
+            </form>
             @endif
+        @elseif(request('class_id') && !request('schedule_id'))
+            <div class="px-4 py-8 text-center bg-blue-50">
+                <svg class="w-12 h-12 text-blue-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p class="text-sm text-blue-700">Pilih jadwal untuk menampilkan/mengisi absensi</p>
+            </div>
         @elseif(request('class_id'))
             <div class="px-4 py-12 text-center">
                 <svg class="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

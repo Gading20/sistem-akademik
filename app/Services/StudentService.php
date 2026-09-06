@@ -6,31 +6,59 @@ use App\Enums\RoleEnum;
 use App\Enums\StudentStatusEnum;
 use App\Models\ClassMember;
 use App\Models\ClassRoom;
+use App\Models\Role;
 use App\Models\Student;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 
 class StudentService
 {
+    /**
+     * Password default untuk akun siswa baru/import saat password tidak diisi.
+     */
+    public const DEFAULT_PASSWORD = 'siswa123';
+
+    /**
+     * Cost bcrypt khusus akun hasil import massal.
+     *
+     * Import sinkron per baris; dengan cost default (12, ±300ms/hash di server)
+     * ratusan baris saja sudah melewati batas waktu PHP 30 detik -> Gateway Timeout.
+     * Cost 8 (±18ms/hash) memangkas waktu hingga ~16x untuk password default yang
+     * memang lemah. Hash otomatis ditingkatkan ke cost default saat akun pertama
+     * kali login (SessionGuard melakukan rehash bila needsRehash()).
+     */
+    public const IMPORT_PASSWORD_ROUNDS = 8;
+
     public function __construct(
         protected AuditLogService $auditLogService,
     ) {}
 
-    public function create(array $data): Student
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array{password_rounds?: int, skip_audit?: bool}  $options
+     */
+    public function create(array $data, array $options = []): Student
     {
-        return DB::transaction(function () use ($data) {
+        return DB::transaction(function () use ($data, $options) {
+            $passwordRounds = $options['password_rounds'] ?? null;
+
             $user = User::create([
                 'name' => $data['name'],
-                'email' => $data['email'] ?? $data['nisn'] . '@student.sch.id',
-                'password' => Hash::make($data['password'] ?? Str::random(8)),
+                // Kolom email/password kosong pada CSV diperlakukan sama seperti tidak diisi:
+                // email otomatis dari NISN dan password memakai default (users.email unik & NOT NULL).
+                'email' => trim((string) ($data['email'] ?? '')) ?: $data['nisn'].'@student.sch.id',
+                'password' => Hash::make(
+                    trim((string) ($data['password'] ?? '')) ?: self::DEFAULT_PASSWORD,
+                    $passwordRounds ? ['rounds' => $passwordRounds] : []
+                ),
                 'role_id' => $this->getRoleId(RoleEnum::SISWA),
                 'is_active' => true,
             ]);
 
             $classId = $data['class_id'] ?? null;
-            if (empty($classId) && !empty($data['class_name'])) {
+            if (empty($classId) && ! empty($data['class_name'])) {
                 $class = ClassRoom::where('name', $data['class_name'])->first();
                 $classId = $class?->id;
             }
@@ -55,7 +83,9 @@ class StudentService
                 $this->syncClassMembership($student, $classId);
             }
 
-            $this->auditLogService->log($user, 'created', Student::class, $student->id, null, $student->toArray());
+            if (! ($options['skip_audit'] ?? false)) {
+                $this->auditLogService->log($user, 'created', Student::class, $student->id, null, $student->toArray());
+            }
 
             return $student->load('user');
         });
@@ -106,7 +136,7 @@ class StudentService
             ->where('class_id', '!=', $classRoom?->id)
             ->update(['is_active' => false]);
 
-        if (!$classRoom) {
+        if (! $classRoom) {
             return;
         }
 
@@ -128,7 +158,11 @@ class StudentService
         foreach ($students as $index => $studentData) {
             try {
                 $this->validateImportRow($studentData, $index + 2);
-                $this->create($studentData);
+                $this->create($studentData, [
+                    // Import massal: hash murah + audit dirangkum sekali di controller.
+                    'password_rounds' => self::IMPORT_PASSWORD_ROUNDS,
+                    'skip_audit' => true,
+                ]);
                 $results['success']++;
             } catch (\Exception $e) {
                 $results['failed']++;
@@ -157,22 +191,25 @@ class StudentService
         if (empty($data['name'])) {
             $errors[] = 'Nama wajib diisi';
         }
-        if (empty($data['gender']) || !in_array($data['gender'], ['male', 'female'])) {
+        if (empty($data['gender']) || ! in_array($data['gender'], ['male', 'female'])) {
             $errors[] = 'Gender harus male atau female';
         }
-        if (!empty($data['email']) && !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+        if (! empty($data['email']) && ! filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
             $errors[] = 'Format email tidak valid';
         }
-        if (!empty($data['birth_date']) && !strtotime($data['birth_date'])) {
+        if (! empty($data['birth_date']) && ! strtotime($data['birth_date'])) {
             $errors[] = 'Format tanggal lahir tidak valid (YYYY-MM-DD)';
         }
+        if (! empty($data['class_name']) && ! ClassRoom::where('name', $data['class_name'])->exists()) {
+            $errors[] = "Kelas '{$data['class_name']}' tidak ditemukan";
+        }
 
-        if (!empty($errors)) {
-            throw new \Exception('Baris ' . $row . ': ' . implode(', ', $errors));
+        if (! empty($errors)) {
+            throw new \Exception('Baris '.$row.': '.implode(', ', $errors));
         }
     }
 
-    public function getStudentsByClass(int $classId): \Illuminate\Database\Eloquent\Collection
+    public function getStudentsByClass(int $classId): Collection
     {
         return Student::with(['user', 'classRoom'])
             ->active()
@@ -182,6 +219,6 @@ class StudentService
 
     private function getRoleId(RoleEnum $role): int
     {
-        return \App\Models\Role::where('name', $role->value)->first()->id;
+        return Role::where('name', $role->value)->first()->id;
     }
 }

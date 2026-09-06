@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Dashboard') - Sistem Akademik SMK Nurul Ulum</title>
+    <link rel="icon" type="image/png" href="{{ asset('images/logo.png') }}">
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -17,6 +18,25 @@
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
                     },
+                    // Warna identitas SMK Nurul Ulum Lebaksiu: hijau.
+                    // Memetakan seluruh skala 'blue' ke hijau agar semua komponen
+                    // (tombol, sidebar, fokus, badge) langsung berubah tanpa
+                    // mengedit puluhan file view satu per satu.
+                    colors: {
+                        blue: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            200: '#bbf7d0',
+                            300: '#86efac',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                            950: '#052e16',
+                        },
+                    },
                 },
             },
         }
@@ -25,8 +45,7 @@
         [x-cloak] { display: none !important; }
     </style>
     @stack('styles')
-</head>
-<body class="h-full font-sans bg-gray-50 text-gray-900 antialiased" x-data="{ mobileMenuOpen: false }">
+</head>    <body class="h-full font-sans bg-gray-50 text-gray-900 antialiased" x-data="{ mobileMenuOpen: false }">
     <div class="min-h-full">
         {{-- Sidebar --}}
         <aside
@@ -37,11 +56,7 @@
             {{-- Mobile close button --}}
             <div class="flex items-center justify-between p-4 border-b border-gray-200 lg:hidden">
                 <div class="flex items-center gap-2">
-                    <div class="flex items-center justify-center w-8 h-8 bg-blue-600 rounded-lg">
-                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                        </svg>
-                    </div>
+                    <img src="{{ asset('images/logo.png') }}" alt="Logo SMK Nurul Ulum" class="w-9 h-9 rounded-full object-cover">
                     <span class="text-lg font-semibold text-gray-900">SMK NU</span>
                 </div>
                 <button @click="mobileMenuOpen = false" class="p-1 text-gray-400 hover:text-gray-600">
@@ -53,11 +68,7 @@
 
             {{-- Logo --}}
             <div class="hidden lg:flex items-center gap-2 p-4 border-b border-gray-200">
-                <div class="flex items-center justify-center w-8 h-8 bg-blue-600 rounded-lg">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                    </svg>
-                </div>
+                <img src="{{ asset('images/logo.png') }}" alt="Logo SMK Nurul Ulum" class="w-9 h-9 rounded-full object-cover">
                 <div>
                     <div class="text-sm font-semibold text-gray-900">SMK Nurul Ulum</div>
                     <div class="text-xs text-gray-500">Sistem Akademik</div>
@@ -322,8 +333,17 @@
                         </button>
 
                         {{-- User dropdown --}}
-                        <div x-data="{ open: false }" class="relative">
-                            <button @click="open = !open" class="flex items-center gap-3 p-1.5 rounded-lg hover:bg-gray-100">
+                        {{-- @click.away di wrapper menutup menu saat klik di luar dropdown.
+                             @click.stop pada tombol toggle memastikan klik toggle TIDAK ikut
+                             memicu click.away (mencegah dropdown langsung tertutup / tidak bisa ditutup). --}}
+                        <div x-data="{ open: false }" @click.away="open = false" @keydown.escape.window="open = false" class="relative">
+                            <button
+                                type="button"
+                                @click.stop="open = !open"
+                                :aria-expanded="open ? 'true' : 'false'"
+                                aria-haspopup="menu"
+                                class="flex items-center gap-3 p-1.5 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                            >
                                 <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                                     <span class="text-sm font-medium text-blue-600">{{ substr(auth()->user()->name, 0, 1) }}</span>
                                 </div>
@@ -331,23 +351,24 @@
                                     <div class="text-sm font-medium text-gray-700">{{ auth()->user()->name }}</div>
                                     <div class="text-xs text-gray-500">{{ auth()->user()->role?->label ?? 'Unknown' }}</div>
                                 </div>
-                                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="w-4 h-4 text-gray-400" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                 </svg>
                             </button>
 
                             <div
                                 x-show="open"
-                                @click.away="open = false"
+                                @click="open = false"
                                 x-transition
                                 class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50"
                                 x-cloak
+                                role="menu"
                             >
-                                <a href="{{ route('profile') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profil Saya</a>
+                                <a href="{{ route('profile') }}" role="menuitem" class="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100">Profil Saya</a>
                                 <hr class="my-1 border-gray-200">
                                 <form method="POST" action="{{ route('logout') }}">
                                     @csrf
-                                    <button type="submit" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Keluar</button>
+                                    <button type="submit" role="menuitem" class="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-gray-100">Keluar</button>
                                 </form>
                             </div>
                         </div>

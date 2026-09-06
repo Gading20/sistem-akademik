@@ -13,6 +13,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class TeacherController extends Controller
 {
@@ -97,5 +98,102 @@ class TeacherController extends Controller
 
         return redirect()->route('master.teachers.index')
             ->with('success', 'Guru berhasil dihapus.');
+    }
+
+    public function import(): View
+    {
+        $this->authorize('create', Teacher::class);
+
+        return view('master.teachers.import');
+    }
+
+    public function processImport(Request $request): RedirectResponse
+    {
+        $this->authorize('create', Teacher::class);
+
+        set_time_limit(240);
+
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,xlsx,xls', 'max:5120'],
+        ]);
+
+        $file = $request->file('file');
+        $extension = $file->getClientOriginalExtension();
+
+        if (in_array($extension, ['csv'])) {
+            $handle = fopen($file->getPathname(), 'r');
+            $headers = fgetcsv($handle);
+            $teachers = [];
+
+            while (($row = fgetcsv($handle)) !== false) {
+                if (count($row) === count($headers)) {
+                    $teachers[] = array_combine($headers, $row);
+                }
+            }
+
+            fclose($handle);
+        } else {
+            $spreadsheet = IOFactory::load($file->getPathname());
+            $sheet = $spreadsheet->getActiveSheet();
+            $data = $sheet->toArray();
+            $headers = array_shift($data);
+
+            $teachers = array_map(function ($row) use ($headers) {
+                return count($row) === count($headers) ? array_combine($headers, $row) : null;
+            }, $data);
+            $teachers = array_filter($teachers);
+        }
+
+        $results = $this->teacherService->import($teachers);
+
+        $this->auditLogService->log(
+            Auth::user(),
+            'imported',
+            Teacher::class,
+            null,
+            null,
+            ['success' => $results['success'], 'failed' => $results['failed']]
+        );
+
+        return redirect()->route('master.teachers.index')
+            ->with('import_results', $results);
+    }
+
+    public function downloadTemplate()
+    {
+        $this->authorize('create', Teacher::class);
+
+        $filename = 'template_import_guru.csv';
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+
+        $callback = function () {
+            $file = fopen('php://output', 'w');
+
+            // Header
+            fputcsv($file, [
+                'nip', 'nuptk', 'name', 'email', 'gender',
+                'subject_name', 'place_of_birth', 'date_of_birth',
+                'address', 'phone', 'join_date',
+            ]);
+
+            // Sample data
+            fputcsv($file, [
+                '198501012010011001', '1234567890123456', 'Budi Santoso, S.Pd', 'budi@email.com', 'male',
+                'Matematika', 'Jakarta', '1985-01-01',
+                'Jl. Pendidikan No. 10', '081234567890', '2010-07-01',
+            ]);
+            fputcsv($file, [
+                '198601012011012001', '1234567890123457', 'Ani Wijaya, S.Pd', 'ani@email.com', 'female',
+                'Bahasa Indonesia', 'Bandung', '1986-01-01',
+                'Jl. Guru No. 5', '081234567891', '2011-07-01',
+            ]);
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
 }

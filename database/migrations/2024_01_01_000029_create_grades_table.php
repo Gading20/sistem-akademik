@@ -27,7 +27,7 @@ return new class extends Migration
             $table->boolean('is_remedial')->default(false);
             $table->timestamps();
 
-            $table->unique(['student_id', 'subject_id', 'class_id', 'academic_year_id', 'semester_id', 'is_remedial']);
+            $table->unique(['student_id', 'subject_id', 'class_id', 'academic_year_id', 'semester_id', 'is_remedial'], 'grades_scope_unique');
         });
     }
 

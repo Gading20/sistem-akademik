@@ -33,7 +33,9 @@ class SecurityHeaders
             'Content-Security-Policy',
             implode('; ', [
                 "default-src 'self'",
-                "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net",
+                // 'unsafe-eval' wajib karena Alpine.js mengevaluasi ekspresi (x-show, @click, dll.)
+                // lewat new Function(); tanpa ini seluruh interaksi Alpine tidak berjalan.
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net",
                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com",
                 "font-src 'self' data: https://fonts.gstatic.com",
                 "img-src 'self' data: blob:",

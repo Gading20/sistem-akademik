@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Academic;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Academic\StoreAttendanceRequest;
+use App\Models\AcademicYear;
 use App\Models\Attendance;
 use App\Models\ClassRoom;
 use App\Models\Schedule;
+use App\Models\Semester;
 use App\Models\Student;
 use App\Services\AttendanceService;
 use App\Services\AuditLogService;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -27,10 +30,13 @@ class AttendanceController extends Controller
         $this->authorize('viewAny', Attendance::class);
 
         $classId = $request->input('class_id');
+        $scheduleId = $request->input('schedule_id');
         $date = $request->input('date', now()->toDateString());
 
         $attendances = collect();
         $students = collect();
+        $existingAttendances = collect();
+        $isAlreadyRecorded = false;
 
         if ($classId) {
             $attendances = $this->attendanceService->getClassAttendance($classId, $date);
@@ -41,13 +47,36 @@ class AttendanceController extends Controller
         }
 
         $classes = ClassRoom::active()->orderBy('name')->get();
+        $dayName = Carbon::parse($date)->locale('en')->dayName;
+
         $schedules = Schedule::with(['teachingAssignment.teacher.user', 'teachingAssignment.classRoom', 'teachingAssignment.subject'])
             ->when($classId, fn ($q) => $q->whereHas('teachingAssignment', fn ($q2) => $q2->where('class_id', $classId)))
-            ->when($date, fn ($q) => $q->where('day', \Carbon\Carbon::parse($date)->locale('id')->isoFormat('dddd')))
+            ->when($date, fn ($q) => $q->where('day', strtolower($dayName)))
             ->orderBy('start_time')
             ->get();
 
-        return view('academic.attendance.index', compact('attendances', 'students', 'classes', 'schedules', 'classId', 'date'));
+        // Cek apakah absensi untuk schedule dan tanggal ini sudah dicatat
+        if ($scheduleId && $date) {
+            $existingAttendances = Attendance::where('schedule_id', $scheduleId)
+                ->where('date', $date)
+                ->with('student.user')
+                ->get()
+                ->keyBy('student_id');
+
+            $isAlreadyRecorded = $existingAttendances->isNotEmpty();
+        }
+
+        return view('academic.attendance.index', compact(
+            'attendances',
+            'students',
+            'classes',
+            'schedules',
+            'classId',
+            'scheduleId',
+            'date',
+            'existingAttendances',
+            'isAlreadyRecorded'
+        ));
     }
 
     public function record(StoreAttendanceRequest $request): RedirectResponse
@@ -82,6 +111,7 @@ class AttendanceController extends Controller
                 if (empty($item['schedule_id'])) {
                     $item['schedule_id'] = $globalScheduleId;
                 }
+
                 return $item;
             })->toArray();
 
@@ -107,6 +137,44 @@ class AttendanceController extends Controller
         }
 
         return back()->with('success', "Berhasil mencatat {$results['success']} absensi.");
+    }
+
+    public function bulkUpdate(Request $request): RedirectResponse
+    {
+        $this->authorize('create', Attendance::class);
+
+        $request->validate([
+            'schedule_id' => ['required', 'exists:schedules,id'],
+            'date' => ['required', 'date'],
+            'attendances' => ['required', 'array', 'min:1'],
+            'attendances.*.attendance_id' => ['required', 'exists:attendances,id'],
+            'attendances.*.status' => ['required', 'string', 'in:hadir,sakit,izin,alpa,terlambat'],
+            'attendances.*.note' => ['nullable', 'string'],
+        ]);
+
+        $updated = 0;
+        foreach ($request->attendances as $data) {
+            $attendance = Attendance::find($data['attendance_id']);
+            if ($attendance) {
+                $attendance->update([
+                    'status' => $data['status'],
+                    'note' => $data['note'] ?? null,
+                    'recorded_by' => Auth::id(),
+                ]);
+                $updated++;
+
+                $this->auditLogService->log(
+                    Auth::user(),
+                    'updated',
+                    Attendance::class,
+                    $attendance->id,
+                    ['status' => $attendance->getOriginal('status')],
+                    $attendance->toArray()
+                );
+            }
+        }
+
+        return back()->with('success', "Berhasil mengupdate {$updated} absensi.");
     }
 
     public function show(Attendance $attendance): View
@@ -140,8 +208,8 @@ class AttendanceController extends Controller
             $summary = $this->attendanceService->getAttendanceSummary($student->id, $academicYearId, $semesterId);
         }
 
-        $academicYears = \App\Models\AcademicYear::orderByDesc('start_date')->get();
-        $semesters = \App\Models\Semester::orderByDesc('start_date')->get();
+        $academicYears = AcademicYear::orderByDesc('start_date')->get();
+        $semesters = Semester::orderByDesc('start_date')->get();
 
         return view('academic.attendance.student', compact('student', 'attendances', 'summary', 'academicYears', 'semesters', 'academicYearId', 'semesterId'));
     }
@@ -155,12 +223,12 @@ class AttendanceController extends Controller
 
         $student = Auth::user()->student;
 
-        if (!$student) {
+        if (! $student) {
             abort(403, 'Data siswa tidak ditemukan untuk akun ini.');
         }
 
-        $activeYear = \App\Models\AcademicYear::active()->first();
-        $activeSemester = \App\Models\Semester::active()->first();
+        $activeYear = AcademicYear::active()->first();
+        $activeSemester = Semester::active()->first();
 
         $academicYearId = $request->input('academic_year_id', $activeYear?->id);
         $semesterId = $request->input('semester_id', $activeSemester?->id);
@@ -173,8 +241,8 @@ class AttendanceController extends Controller
             $summary = $this->attendanceService->getAttendanceSummary($student->id, $academicYearId, $semesterId);
         }
 
-        $academicYears = \App\Models\AcademicYear::orderByDesc('start_date')->get();
-        $semesters = \App\Models\Semester::orderByDesc('start_date')->get();
+        $academicYears = AcademicYear::orderByDesc('start_date')->get();
+        $semesters = Semester::orderByDesc('start_date')->get();
 
         return view('academic.attendance.student', compact('student', 'attendances', 'summary', 'academicYears', 'semesters', 'academicYearId', 'semesterId'));
     }

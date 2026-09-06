@@ -5,12 +5,12 @@ namespace App\Http\Controllers\Report;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicYear;
 use App\Models\Attendance;
-use App\Models\ClassMember;
 use App\Models\ClassRoom;
 use App\Models\Grade;
 use App\Models\ReportCard;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Models\Subject;
 use App\Services\AttendanceService;
 use App\Services\GradeService;
 use Illuminate\Http\Request;
@@ -66,19 +66,68 @@ class ReportController extends Controller
         $academicYearId = $request->input('academic_year_id');
         $semesterId = $request->input('semester_id');
 
-        $grades = collect();
-        $student = null;
+        $classes = ClassRoom::active()->orderBy('name')->get();
+        $students = Student::with('user')->active()->orderBy('nis')->get();
+        $subjects = Subject::active()->orderBy('name')->get();
+        $academicYears = AcademicYear::orderByDesc('start_date')->get();
+        $semesters = Semester::orderByDesc('start_date')->get();
 
-        if ($studentId && $academicYearId && $semesterId) {
-            $grades = $this->gradeService->getStudentGrades($studentId, $academicYearId, $semesterId);
-            $student = Student::with('user')->find($studentId);
+        $reportData = collect();
+        $student = $studentId ? $students->firstWhere('id', (int) $studentId) : null;
+
+        $hasScope = (bool) ($studentId || $classId);
+
+        if ($hasScope) {
+            $academicYear = $academicYearId
+                ? AcademicYear::find($academicYearId)
+                : (AcademicYear::active()->first() ?? AcademicYear::latest('start_date')->first());
+
+            $semester = $semesterId
+                ? Semester::find($semesterId)
+                : (Semester::active()->first() ?? Semester::latest('start_date')->first());
+
+            $scopedStudents = $classId
+                ? $students->where('class_id', (int) $classId)->values()
+                : $students->where('id', (int) $studentId)->values();
+
+            if ($academicYear && $semester && $scopedStudents->isNotEmpty()) {
+                $gradeRows = Grade::whereIn('student_id', $scopedStudents->pluck('id'))
+                    ->where('academic_year_id', $academicYear->id)
+                    ->where('semester_id', $semester->id)
+                    ->when($subjectId, fn ($q) => $q->where('subject_id', $subjectId))
+                    ->get(['student_id', 'subject_id', 'final_score']);
+
+                $reportData = $scopedStudents->map(function ($scopedStudent) use ($gradeRows) {
+                    $scores = $gradeRows
+                        ->where('student_id', $scopedStudent->id)
+                        ->filter(fn ($grade) => $grade->final_score !== null)
+                        ->mapWithKeys(fn ($grade) => [
+                            $grade->subject_id => round((float) $grade->final_score, 2),
+                        ]);
+
+                    return [
+                        'student' => $scopedStudent,
+                        'grades' => $scores,
+                        'average' => $scores->isNotEmpty() ? round($scores->avg(), 2) : null,
+                    ];
+                });
+            }
         }
 
-        $classes = ClassRoom::active()->orderBy('name')->get();
-        $students = Student::with('user')->active()->get();
-        $academicYears = AcademicYear::orderByDesc('start_date')->get();
-
-        return view('reports.grades', compact('grades', 'student', 'classes', 'students', 'academicYears', 'studentId', 'classId', 'subjectId', 'academicYearId', 'semesterId'));
+        return view('reports.grades', compact(
+            'reportData',
+            'student',
+            'classes',
+            'students',
+            'subjects',
+            'academicYears',
+            'semesters',
+            'studentId',
+            'classId',
+            'subjectId',
+            'academicYearId',
+            'semesterId'
+        ));
     }
 
     public function ranking(Request $request): View
@@ -105,5 +154,4 @@ class ReportController extends Controller
 
         return view('reports.ranking', compact('rankings', 'classes', 'academicYears', 'classId', 'academicYearId', 'semesterId'));
     }
-
 }

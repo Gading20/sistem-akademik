@@ -80,13 +80,13 @@
                             <td class="px-4 py-3 text-gray-600">{{ $student->classRoom->name ?? '-' }}</td>
                             <td class="px-4 py-3 text-gray-600">{{ $student->gender === 'male' ? 'Laki-laki' : 'Perempuan' }}</td>
                             <td class="px-4 py-3">
-                                @if($student->status === 'active')
+                                @if($student->status->value === 'active')
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Aktif</span>
-                                @elseif($student->status === 'inactive')
+                                @elseif($student->status->value === 'inactive')
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Non Aktif</span>
-                                @elseif($student->status === 'graduated')
+                                @elseif($student->status->value === 'graduated')
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Lulus</span>
-                                @elseif($student->status === 'transferred')
+                                @elseif($student->status->value === 'transferred')
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">Pindah</span>
                                 @else
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Keluar</span>

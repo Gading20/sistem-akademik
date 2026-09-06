@@ -32,7 +32,7 @@ class ClassController extends Controller
         $search = $request->input('search');
         $academicYearId = $request->input('academic_year_id');
 
-        $classes = ClassRoom::with(['major', 'competency', 'academicYear'])
+        $classes = ClassRoom::with(['major', 'competency', 'academicYear', 'waliKelas.user'])
             ->when($academicYearId, fn ($q) => $q->where('academic_year_id', $academicYearId))
             ->when($search, fn ($q) => $q->where('name', 'like', "%{$search}%"))
             ->latest()

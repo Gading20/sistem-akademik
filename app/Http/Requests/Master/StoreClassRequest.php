@@ -19,6 +19,7 @@ class StoreClassRequest extends FormRequest
             'competency_id' => ['nullable', 'exists:competencies,id'],
             'academic_year_id' => ['required', 'exists:academic_years,id'],
             'semester_id' => ['required', 'exists:semesters,id'],
+            'wali_kelas_id' => ['nullable', 'exists:teachers,id'],
             'capacity' => ['sometimes', 'integer', 'min:1'],
             'is_active' => ['sometimes', 'boolean'],
         ];
@@ -34,6 +35,7 @@ class StoreClassRequest extends FormRequest
             'academic_year_id.exists' => 'Tahun ajaran tidak ditemukan.',
             'semester_id.required' => 'Semester wajib dipilih.',
             'semester_id.exists' => 'Semester tidak ditemukan.',
+            'wali_kelas_id.exists' => 'Wali kelas tidak ditemukan.',
         ];
     }
 }

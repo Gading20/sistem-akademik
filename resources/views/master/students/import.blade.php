@@ -30,6 +30,8 @@
                 <li>5. Separator koma (,)</li>
                 <li>6. Gender: <strong>male</strong> atau <strong>female</strong></li>
                 <li>7. Class_name diisi dengan nama kelas (contoh: X RPL 1)</li>
+                <li>8. Password default akun siswa hasil import: <strong>siswa123</strong> (bisa ditimpa per baris dengan kolom opsional <strong>password</strong>)</li>
+                <li>9. Untuk file berukuran besar proses bisa berjalan beberapa menit — biarkan halaman tetap terbuka sampai selesai, jangan di-refresh.</li>
             </ul>
         </div>
 

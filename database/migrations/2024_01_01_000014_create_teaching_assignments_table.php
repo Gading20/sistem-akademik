@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('semester_id')->constrained('semesters')->cascadeOnDelete();
             $table->timestamps();
 
-            $table->unique(['teacher_id', 'subject_id', 'class_id', 'academic_year_id', 'semester_id']);
+            $table->unique(['teacher_id', 'subject_id', 'class_id', 'academic_year_id', 'semester_id'], 'teaching_assignments_scope_unique');
         });
     }
 

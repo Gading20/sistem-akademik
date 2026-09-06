@@ -6,8 +6,12 @@ use App\Enums\RoleEnum;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Exam\StoreExamRequest;
 use App\Http\Requests\Exam\UpdateExamRequest;
+use App\Models\AcademicYear;
+use App\Models\ClassRoom;
 use App\Models\Exam;
+use App\Models\ExamAttempt;
 use App\Models\QuestionBank;
+use App\Models\Semester;
 use App\Models\Subject;
 use App\Models\Teacher;
 use App\Services\AuditLogService;
@@ -55,9 +59,9 @@ class ExamController extends Controller
 
         $subjects = Subject::active()->orderBy('name')->get();
         $teachers = Teacher::with('user')->active()->get();
-        $academicYears = \App\Models\AcademicYear::orderByDesc('start_date')->get();
-        $semesters = \App\Models\Semester::orderByDesc('start_date')->get();
-        $classes = \App\Models\ClassRoom::active()->orderBy('name')->get();
+        $academicYears = AcademicYear::orderByDesc('start_date')->get();
+        $semesters = Semester::orderByDesc('start_date')->get();
+        $classes = ClassRoom::active()->orderBy('name')->get();
         $questionBanks = QuestionBank::with(['questions' => fn ($q) => $q->where('is_active', true)->orderBy('id')])
             ->withCount('questions')
             ->orderBy('name')
@@ -107,9 +111,9 @@ class ExamController extends Controller
 
         $subjects = Subject::active()->orderBy('name')->get();
         $teachers = Teacher::with('user')->active()->get();
-        $academicYears = \App\Models\AcademicYear::orderByDesc('start_date')->get();
-        $semesters = \App\Models\Semester::orderByDesc('start_date')->get();
-        $classes = \App\Models\ClassRoom::active()->orderBy('name')->get();
+        $academicYears = AcademicYear::orderByDesc('start_date')->get();
+        $semesters = Semester::orderByDesc('start_date')->get();
+        $classes = ClassRoom::active()->orderBy('name')->get();
         $questionBanks = QuestionBank::with(['questions' => fn ($q) => $q->where('is_active', true)->orderBy('id')])
             ->withCount('questions')
             ->orderBy('name')
@@ -189,6 +193,12 @@ class ExamController extends Controller
 
         $results = $this->examService->getExamResult($exam);
 
-        return view('exam.exams.results', array_merge($results, ['exam' => $exam]));
+        $attempts = ExamAttempt::with(['student.user', 'answers'])
+            ->where('exam_id', $exam->id)
+            ->submitted()
+            ->latest('submitted_at')
+            ->paginate(15);
+
+        return view('exam.exams.results', array_merge($results, ['exam' => $exam, 'attempts' => $attempts]));
     }
 }

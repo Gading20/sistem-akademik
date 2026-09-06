@@ -23,7 +23,7 @@ return new class extends Migration
             $table->decimal('project_weight', 5, 2)->default(10);
             $table->timestamps();
 
-            $table->unique(['subject_id', 'class_id', 'academic_year_id', 'semester_id']);
+            $table->unique(['subject_id', 'class_id', 'academic_year_id', 'semester_id'], 'grading_configs_scope_unique');
         });
     }
 

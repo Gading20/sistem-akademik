@@ -14,6 +14,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class StudentController extends Controller
 {
@@ -115,6 +116,11 @@ class StudentController extends Controller
     {
         $this->authorize('create', Student::class);
 
+        // Import massal berjalan sinkron; PHP-FPM default membatasi 30 detik per request
+        // sehingga file besar berakhir Gateway Timeout. Batas gateway server 300 detik,
+        // jadi cukup naikkan batas request ini (bukan global).
+        set_time_limit(240);
+
         $request->validate([
             'file' => ['required', 'file', 'mimes:csv,xlsx,xls', 'max:5120'],
         ]);
@@ -135,7 +141,7 @@ class StudentController extends Controller
 
             fclose($handle);
         } else {
-            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($file->getPathname());
+            $spreadsheet = IOFactory::load($file->getPathname());
             $sheet = $spreadsheet->getActiveSheet();
             $data = $sheet->toArray();
             $headers = array_shift($data);
@@ -147,6 +153,15 @@ class StudentController extends Controller
         }
 
         $results = $this->studentService->import($students);
+
+        $this->auditLogService->log(
+            Auth::user(),
+            'imported',
+            Student::class,
+            null,
+            null,
+            ['success' => $results['success'], 'failed' => $results['failed']]
+        );
 
         return redirect()->route('master.students.index')
             ->with('import_results', $results);
@@ -169,19 +184,19 @@ class StudentController extends Controller
             fputcsv($file, [
                 'nisn', 'nis', 'name', 'email', 'gender',
                 'class_name', 'birth_place', 'birth_date',
-                'religion', 'address', 'phone'
+                'religion', 'address', 'phone',
             ]);
 
             // Sample data
             fputcsv($file, [
                 '0012345678', '2024001', 'Ahmad Rizky', 'ahmad@email.com', 'male',
                 'X RPL 1', 'Jakarta', '2008-05-15',
-                'Islam', 'Jl. Merdeka No. 1', '081234567890'
+                'Islam', 'Jl. Merdeka No. 1', '081234567890',
             ]);
             fputcsv($file, [
                 '0012345679', '2024002', 'Siti Nurhaliza', 'siti@email.com', 'female',
                 'X RPL 2', 'Bandung', '2008-06-20',
-                'Islam', 'Jl. Asia Afrika No. 5', '081234567891'
+                'Islam', 'Jl. Asia Afrika No. 5', '081234567891',
             ]);
 
             fclose($file);

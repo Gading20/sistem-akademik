@@ -19,6 +19,7 @@ class UpdateClassRequest extends FormRequest
             'competency_id' => ['nullable', 'exists:competencies,id'],
             'academic_year_id' => ['sometimes', 'exists:academic_years,id'],
             'semester_id' => ['sometimes', 'exists:semesters,id'],
+            'wali_kelas_id' => ['nullable', 'exists:teachers,id'],
             'capacity' => ['sometimes', 'integer', 'min:1'],
             'is_active' => ['sometimes', 'boolean'],
         ];
@@ -30,6 +31,7 @@ class UpdateClassRequest extends FormRequest
             'major_id.exists' => 'Jurusan tidak ditemukan.',
             'academic_year_id.exists' => 'Tahun ajaran tidak ditemukan.',
             'semester_id.exists' => 'Semester tidak ditemukan.',
+            'wali_kelas_id.exists' => 'Wali kelas tidak ditemukan.',
         ];
     }
 }

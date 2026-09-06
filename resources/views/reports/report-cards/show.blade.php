@@ -25,9 +25,7 @@
         {{-- Header --}}
         <div class="p-8 text-center border-b border-gray-200">
             <div class="flex items-center justify-center gap-4 mb-4">
-                <div class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center">
-                    <span class="text-2xl font-bold text-white">NU</span>
-                </div>
+                <img src="{{ asset('images/logo.png') }}" alt="Logo SMK Nurul Ulum" class="w-16 h-16 rounded-full object-cover">
                 <div class="text-left">
                     <h1 class="text-xl font-bold text-gray-900">SMK Nurul Ulum</h1>
                     <p class="text-sm text-gray-500">Jl. Contoh Alamat No. 123, Kota</p>

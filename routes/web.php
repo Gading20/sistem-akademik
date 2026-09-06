@@ -1,11 +1,11 @@
 <?php
 
-use App\Http\Controllers\Announcement\AnnouncementController;
 use App\Http\Controllers\Academic\AssignmentController;
 use App\Http\Controllers\Academic\AttendanceController;
 use App\Http\Controllers\Academic\JournalController;
 use App\Http\Controllers\Academic\ScheduleController;
 use App\Http\Controllers\Academic\TeachingAssignmentController;
+use App\Http\Controllers\Announcement\AnnouncementController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Dashboard\DashboardController;
 use App\Http\Controllers\Exam\ExamAttemptController;
@@ -63,6 +63,9 @@ Route::middleware(['auth'])->group(function () {
         Route::post('students/import', [StudentController::class, 'processImport'])->name('students.import.process');
         Route::get('students/import/template', [StudentController::class, 'downloadTemplate'])->name('students.import.template');
         Route::resource('students', StudentController::class)->except(['show']);
+        Route::get('teachers/import', [TeacherController::class, 'import'])->name('teachers.import');
+        Route::post('teachers/import', [TeacherController::class, 'processImport'])->name('teachers.import.process');
+        Route::get('teachers/import/template', [TeacherController::class, 'downloadTemplate'])->name('teachers.import.template');
         Route::resource('teachers', TeacherController::class)->except(['show']);
     });
 
@@ -80,6 +83,7 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:super_admin,admin_sekolah,guru,wali_kelas'])->prefix('academic')->name('academic.')->group(function () {
         Route::get('attendance', [AttendanceController::class, 'index'])->name('attendance.index');
         Route::post('attendance', [AttendanceController::class, 'bulkRecord'])->name('attendance.bulk-record');
+        Route::put('attendance/bulk-update', [AttendanceController::class, 'bulkUpdate'])->name('attendance.bulk-update');
         Route::get('attendance/student/{student}', [AttendanceController::class, 'byStudent'])->name('attendance.student');
     });
 

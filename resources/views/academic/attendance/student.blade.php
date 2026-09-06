@@ -52,7 +52,7 @@
         <div class="p-6 border-b border-gray-200">
             <div class="flex items-center gap-4">
                 <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                    <span class="text-lg font-semibold text-blue-60">{{ substr($student->user->name, 0, 1) }}</span>
+                    <span class="text-lg font-semibold text-blue-600">{{ substr($student->user->name, 0, 1) }}</span>
                 </div>
                 <div>
                     <h3 class="text-lg font-semibold text-gray-900">{{ $student->user->name }}</h3>
@@ -132,7 +132,7 @@
             </table>
         </div>
 
-        @if($attendances->hasPages())
+        @if($attendances instanceof \Illuminate\Contracts\Pagination\Paginator && $attendances->hasPages())
             <div class="p-4 border-t border-gray-200">
                 {{ $attendances->links() }}
             </div>

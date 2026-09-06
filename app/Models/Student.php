@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\StudentStatusEnum;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -34,6 +35,7 @@ class Student extends Model
         return [
             'birth_date' => 'date',
             'admission_date' => 'date',
+            'status' => StudentStatusEnum::class,
         ];
     }
 
